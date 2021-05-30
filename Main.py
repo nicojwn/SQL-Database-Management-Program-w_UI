@@ -157,6 +157,7 @@ class Main(QMainWindow):
 
 class Edit(QMainWindow):
 	def __init__(self, stack, windowStack, main):
+
 		super(Edit, self).__init__()
 		loadUi("Edit.ui", self)
 
@@ -169,6 +170,8 @@ class Edit(QMainWindow):
 
 		self.localToSQL = {}
 
+		self.font = QFont("Arial", 20)
+
 		self.commited = False
 
 		self.addTableUI = []
@@ -178,12 +181,17 @@ class Edit(QMainWindow):
 		self.removeEntityUI = []
 		self.removeAttributeUI = []
 
+		self.dataTypes = ["CHAR", "VARCHAR", "TEXT", "TINYTEXT", "INT"]
+		self.inputs = [QLineEdit, QLineEdit, QLineEdit, QLineEdit, QSpinBox]
+		self.dataTypesQ = {"CHAR":(1,255), "VARCHAR":(1,65535), "TEXT":(1,65535), "INT":(1,2147483647)} # Requiring Quantity
+		self.constraints = ["", "NOT NULL", "UNIQUE", "PRIMARY KEY"]
+
 		self.LocalUiSetup()
 
 	def LocalUiSetup(self):
 		self.ButtonConnect()
 		self.ActionConnection()
-		self.GenerateUIPresets()
+		# self.GenerateUIPresets()
 
 	"""CONNECT METHODS"""
 	def ButtonConnect(self):
@@ -200,13 +208,6 @@ class Edit(QMainWindow):
 		self.actionRemove_Table.triggered.connect(self.RemoveTableUI)
 		self.actionRemove_Entity.triggered.connect(self.RemoveEntityUI)
 		self.actionRemove_Attribute.triggered.connect(self.RemoveAttributeUI)
-	def GenerateUIPresets(self):
-		self.GenerateAddTableUI()
-		self.GenerateAddEntityUI()
-		self.GenerateAddAttributeUI()
-		self.GenerateRemoveTableUI()
-		self.GenerateRemoveEntityUI()
-		self.GenerateRemoveAttributeUI()
 	def Home(self):
 		self.stack.setCurrentIndex(self.windowStack.index("home"))
 	def Commit(self):
@@ -225,45 +226,38 @@ class Edit(QMainWindow):
 	"""EDIT UI METHODS"""
 	def GenerateAddTableUI(self):
 
-		font = QFont("Arial", 20)
-
 		attrs = []
-		hbox_2 = QHBoxLayout()
-		vbox_1 = QVBoxLayout()
-		vbox_2 = QVBoxLayout()
 
-		dataTypes = ["CHAR", "VARCHAR", "TEXT", "TINYTEXT"]
-		dataTypesQ = {"CHAR":255, "VARCHAR":65535, "TEXT":1000000} # Requiring Quantity
-		constraints = ["", "NOT NULL", "UNIQUE", "PRIMARY KEY"]
+		dataTypes = self.dataTypes
+		dataTypesQ = self.dataTypesQ
+		constraints = self.constraints
 
-		tableNameLineEdit = self.LineEdit("Table Name", font)
-		attrNameLineEdit = self.LineEdit("Attribute Name", font)
+		tableNameLineEdit = self.LineEdit("Table Name", self.font)
+		attrNameLineEdit = self.LineEdit("Attribute Name", self.font)
 
-		quantitySpinBox = self.SpinBox(font, 1)
-
-		dataTypeComboBox = self.ComboBox(
-					dataTypes, 
-					font,
-					lambda: 
-						(
-							hbox_2.removeWidget(quantitySpinBox), 
-							quantitySpinBox.setParent(None)
-						) 
-						if self.UpdateOnSpinBoxChange(hbox_2, quantitySpinBox, dataTypeComboBox.currentText() in dataTypesQ.keys()) 
-						else 
-						(
-							(
-								hbox_2.addWidget(quantitySpinBox),
-								quantitySpinBox.setMaximum(dataTypesQ[dataTypeComboBox.currentText()])
-							), 
-							quantitySpinBox.setMaximum(dataTypesQ[dataTypeComboBox.currentText()])
-						)
-					)
+		dataTypeComboBox = self.ComboBox(dataTypes, self.font)
 		constraintComboBox = self.ComboBox(
 					constraints, 
-					font
+					self.font
 					)
 		
+		quantitySpinBox = self.SpinBox(self.font, minimum = self.dataTypesQ[dataTypeComboBox.currentText()][0], maximum = self.dataTypesQ[dataTypeComboBox.currentText()][1])
+
+		dataTypeComboBox.currentTextChanged.connect(
+						lambda: 
+							(
+								hbox_2.removeWidget(quantitySpinBox), 
+								quantitySpinBox.setParent(None)
+							) 
+							if self.UpdateOnSpinBoxChange(hbox_2, quantitySpinBox, dataTypeComboBox.currentText() in dataTypesQ.keys()) 
+							else 
+							(
+								hbox_2.addWidget(quantitySpinBox),
+								quantitySpinBox.setMaximum(dataTypesQ[dataTypeComboBox.currentText()][1]),
+								quantitySpinBox.setMinimum(dataTypesQ[dataTypeComboBox.currentText()][0])
+							)
+						)
+
 		addAttrPushButton = self.PushButton(
 						lambda: 
 							attrs.append(
@@ -279,7 +273,7 @@ class Edit(QMainWindow):
 							if not attrNameLineEdit.text() == "" and not attrNameLineEdit.text() in [i[0] for i in attrs]
 							else self.DisplayMessageBox("Please give the attribute a unique name", "Error", QMessageBox.Critical),
 						"Add Attribute",
-						font
+						self.font
 						)
 		createTablePushButton = self.PushButton(
 							lambda: 
@@ -290,9 +284,9 @@ class Edit(QMainWindow):
 								if self.CheckName(tableNameLineEdit.text())
 								else self.DisplayMessageBox("Please give the table a unique name", "Error", QMessageBox.Critical), 
 							"Create Table", 
-							font
+							self.font
 						)
-		showUsedNamesPushButton = self.PushButton(lambda : self.ShowTableNames(), "Used Table Names", font)
+		showUsedNamesPushButton = self.PushButton(lambda : self.ShowTableNames(), "Used Table Names", self.font)
 
 		vbox_1 = self.Layout(QVBoxLayout(), [tableNameLineEdit, createTablePushButton, showUsedNamesPushButton, "s"])
 		hbox_2 = self.Layout(QHBoxLayout(), [dataTypeComboBox, quantitySpinBox])
@@ -311,7 +305,27 @@ class Edit(QMainWindow):
 							createTablePushButton
 						  ]
 	def GenerateAddEntityUI(self):
-		pass
+		
+		tables = self.GetTableNames().split(", ")
+
+		typeToInput = {i:j for i,j in zip(self.dataTypes, self.inputs)}
+
+		chooseAttrsComboBox = self.ComboBox(self.GetAttributes(tables[0]), self.font)
+		chooseTableComboBox = self.ComboBox(tables, self.font)
+
+		attrTypeLabel = self.Label(self.GetAttributes(chooseTableComboBox.currentText())[chooseAttrsComboBox.currentText()], self.font)
+
+		chooseTableComboBox.currentTextChanged.connect(lambda : self.UpdateAttrAndLabel(chooseAttrsComboBox, attrTypeLabel, chooseTableComboBox))
+		chooseAttrsComboBox.currentIndexChanged.connect(lambda : self.UpdateAttrTypeLabel(attrTypeLabel, chooseTableComboBox, chooseAttrsComboBox))
+
+		hbox_1 = self.Layout(QHBoxLayout(), [attrTypeLabel, chooseAttrsComboBox])
+		vbox_1 = self.Layout(QVBoxLayout(), [hbox_1, chooseTableComboBox])
+
+		chooseAttrsComboBox.currentIndexChanged.connect(lambda : self.UpdateAttrInput(chooseAttrsComboBox, hbox_1, typeToInput))
+
+		# Store each value in a dictionary with the key being the attribute name
+
+		self.addEntityUI = [vbox_1, chooseAttrsComboBox, chooseTableComboBox]
 	def GenerateAddAttributeUI(self):
 		pass
 	def GenerateRemoveTableUI(self):
@@ -326,9 +340,9 @@ class Edit(QMainWindow):
 		self.GenerateAddTableUI()
 		self.horizontalLayout_2 = self.Layout(self.horizontalLayout_2, ["s", self.addTableUI[1], self.addTableUI[2], "s"])
 	def AddEntityUI(self):
-		hbox_1 = self.horizontalLayout_2
-		self.ClearLayout(hbox_1)
+		self.ClearLayout(self.horizontalLayout_2)
 		self.GenerateAddEntityUI()
+		self.horizontalLayout_2 = self.Layout(self.horizontalLayout_2, ["s", self.addEntityUI[0],"s"])
 	def AddAttributeUI(self):
 		hbox_1 = self.horizontalLayout_2
 		self.ClearLayout(hbox_1)
@@ -346,6 +360,7 @@ class Edit(QMainWindow):
 		self.ClearLayout(hbox_1)
 		self.GenerateRemoveTableUI()
 
+	"""Add Table Functions"""
 	def IterateThroughLayout(self, layout):
 		children = []
 		for i in range(layout.count()):
@@ -367,13 +382,46 @@ class Edit(QMainWindow):
 			return False
 		return True
 	def ShowTableNames(self):
+		self.DisplayMessageBox(lambda : self.GetTableNames(), "Used Table Names", QMessageBox.Information)
+
+	"""Add Attribute Functions"""
+	def GetAttributes(self, table):
+		command = "PRAGMA TABLE_INFO({});".format(table)
+		self.main.cursor.execute(command)
+		print(self.main.cursor.fetchall())
+		attributes = {i[1] : i[2] for i in self.main.cursor.fetchall()}
+		return attributes
+	def ReplaceComboBox(self, comboBox, newContents):
+		prevCount = comboBox.count()
+		comboBox.addItems(newContents)
+		for i in range(prevCount):
+			comboBox.removeItem(0)
+	def UpdateAttrAndLabel(self, attrComboBox, attrTypeLabel, tableComboBox):
+		self.ReplaceComboBox(attrComboBox, self.GetAttributes(tableComboBox.currentText()))
+		attrTypeLabel.setText(self.GetAttributes(tableComboBox.currentText())[attrComboBox.currentText()])
+	def UpdateAttrTypeLabel(self, attrTypeLabel, tableComboBox, attrComboBox):
+		try:
+			attrTypeLabel.setText(self.GetAttributes(tableComboBox.currentText())[attrComboBox.currentText()])
+		except Exception:
+			pass
+	def UpdateAttrInput(self, attrsComboBox, hbox_1, typeToInput):
+		newInput = typeToInput[attrsComboBox.currentText()]()
+		if type(newInput) == QLineEdit:
+			newInput.setMaxLength()
+		elif type(newInput) == QSpinBox:
+			newInput.setMaximum()
+			newInput.setMinimum()
+		hbox_1.replaceWidget(hbox_1.itemAt(-1), newInput)
+
+	def GetTableNames(self):
+		tableNames = ""
 		self.main.cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table';")
 		names = [i[0] for i in self.main.cursor.fetchall()]
-		toShow = ""
 		for i in names:
-			toShow += str(i) + ", "
-		toShow = toShow[:-2]
-		self.DisplayMessageBox(toShow, "Used Table Names", QMessageBox.Information)
+			tableNames += str(i) + ", "
+		tableNames = tableNames[:-2]
+		return tableNames
+
 
 	def ClearLayout(self, currentLayout):
 		if currentLayout is not None:
@@ -418,6 +466,12 @@ class Edit(QMainWindow):
 		if not font == None:
 			pushButton.setFont(font)
 		return pushButton
+	def Label(self, text, font=None):
+		label = QLabel()
+		label.setText(text)
+		if not font == None:
+			label.setFont(font)
+		return label
 	def Layout(self, lType, widgets):
 		layoutTypes = [QHBoxLayout, QVBoxLayout, QGridLayout]
 		layout = lType
@@ -452,16 +506,25 @@ class Edit(QMainWindow):
 		self.toExecute.append(command)
 		print(self.toExecute)
 	def AddEntityCMD(self, table, attrs):
-		# INSERT INTO table_name VALUES
-		command = "INSERT INTO {} VALUES".format(table)
-		# INSERT INTO table_name VALUES(
+		# INSERT INTO table_name
+		command = "INSERT INTO {}".format(table)
+		# INSERT INTO table_name(
 		tempCommand = "("
-		# INSERT INTO table_name VALUES(value1,value2,...,
-		for i in attrs:
+		# INSERT INTO table_name(attribute1, attribute2,...,
+		for i in list(attrs.keys()):
 			tempCommand += "{},".format(i)
-		# INSERT INTO table_name VALUES(value1,value2,...
+		# INSERT INTO table_name(attribute1, attribute2,...
 		tempCommand = tempCommand[:-1]
-		# INSERT INTO table_name VALUES(value1,value2,...);
+		# INSERT INTO table_name(attribute1, attribute2,...) VALUES
+		tempCommand += ") VALUES"
+		# INSERT INTO table_name(attribute1, attribute2,...) VALUES(
+		tempCommand = "("
+		# INSERT INTO table_name(attribute1, attribute2,...) VALUES(value1,value2,...,
+		for i in list(attrs.values()):
+			tempCommand += "{},".format(i)
+		# INSERT INTO table_name(attribute1, attribute2,...) VALUES(value1,value2,...
+		tempCommand = tempCommand[:-1]
+		# INSERT INTO table_name(attribute1, attribute2,...) VALUES(value1,value2,...);
 		tempCommand += ");"
 
 		command += tempCommand
@@ -584,6 +647,8 @@ class Template(QMainWindow):
 		self.windowStack = windowStack
 
 		self.main = main
+
+		self.font = QFont()
 
 		self.LocalUiSetup()
 
