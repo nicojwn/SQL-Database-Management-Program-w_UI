@@ -1,2 +1,4 @@
 # SQLDMwUI
  An SQL base database management program that is controlled via a UI. The aim is to make a more userfriendly way of creating a managing an SQL database. Even though programming in SQL is very easy the mere fact of it having to be programmed presents a barrier for some people. This program should help overcome that barrier although some knowledge of databases and datatypes used in SQL is expected.
+ 
+ As development progressed it became apparent that SQL has many very unique aspects. For example, there are different datatypes which have different sizes where the sizes can have different meanings (such as the size of a line of text and the size of a number). This makes it difficult and not very fun to program especially on the foundation that the code is currently on. The foundation is made assuming that the code can be automated, however, by the looks of it many pieces of code have to be written for each individual SQL function.
